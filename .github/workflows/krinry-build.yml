@@ -4,98 +4,45 @@ on:
   workflow_dispatch:
     inputs:
       build_type:
-        description: 'Build type (apk or appbundle)'
+        description: 'Build type'
         required: true
         default: 'apk'
         type: string
       mode:
-        description: 'Build mode (debug, release, profile)'
+        description: 'Build mode'
         required: true
         default: 'release'
-        type: string
-      split_per_abi:
-        description: 'Split per ABI (true/false)'
-        required: false
-        default: 'false'
-        type: string
-      target_platform:
-        description: 'Target platform (e.g. android-arm64)'
-        required: false
-        default: ''
         type: string
 
 jobs:
   build:
-    name: Build Flutter ${{ inputs.build_type }} (${{ inputs.mode }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
-
+    
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Java 17
+        
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
+          
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.4'
           channel: 'stable'
-          cache: true
-
+          
       - name: Install dependencies
         run: flutter pub get
-
-      - name: Build APK - Release
-        if: inputs.build_type == 'apk' && inputs.mode == 'release' && inputs.split_per_abi == 'false'
-        run: |
-          if [ -n "${{ inputs.target_platform }}" ]; then
-            flutter build apk --release --target-platform ${{ inputs.target_platform }}
-          else
-            flutter build apk --release
-          fi
-
-      - name: Build APK - Debug
-        if: inputs.build_type == 'apk' && inputs.mode == 'debug' && inputs.split_per_abi == 'false'
-        run: |
-          if [ -n "${{ inputs.target_platform }}" ]; then
-            flutter build apk --debug --target-platform ${{ inputs.target_platform }}
-          else
-            flutter build apk --debug
-          fi
-
-      - name: Build APK - Split per ABI (Release)
-        if: inputs.build_type == 'apk' && inputs.mode == 'release' && inputs.split_per_abi == 'true'
-        run: flutter build apk --release --split-per-abi
-
-      - name: Build APK - Split per ABI (Debug)
-        if: inputs.build_type == 'apk' && inputs.mode == 'debug' && inputs.split_per_abi == 'true'
-        run: flutter build apk --debug --split-per-abi
-
-      - name: Build AppBundle - Release
-        if: inputs.build_type == 'appbundle' && inputs.mode == 'release'
-        run: flutter build appbundle --release
-
-      - name: Build AppBundle - Debug
-        if: inputs.build_type == 'appbundle' && inputs.mode == 'debug'
-        run: flutter build appbundle --debug
-
+        
+      - name: Build APK Release
+        run: flutter build apk --release
+        
       - name: Upload APK
-        if: inputs.build_type == 'apk'
         uses: actions/upload-artifact@v4
         with:
-          name: fox-vodafone-${{ inputs.mode }}
+          name: fox-vodafone-release
           path: build/app/outputs/flutter-apk/*.apk
-          retention-days: 7
-
-      - name: Upload AppBundle
-        if: inputs.build_type == 'appbundle'
-        uses: actions/upload-artifact@v4
-        with:
-          name: fox-vodafone-aab-${{ inputs.mode }}
-          path: build/app/outputs/bundle/release/*.aab
-          retention-days: 7
