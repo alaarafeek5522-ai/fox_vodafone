@@ -1,0 +1,101 @@
+name: Krinry Flutter Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build-type:
+        description: 'Build type'
+        required: true
+        default: 'apk'
+        type: choice
+        options:
+          - apk
+          - appbundle
+      mode:
+        description: 'Build mode'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - debug
+          - release
+          - profile
+      split-per-abi:
+        description: 'Split per ABI'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      target-platform:
+        description: 'Target platform'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  build:
+    name: Build Flutter ${{ inputs.build-type }} (${{ inputs.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.4'
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build APK (release)
+        if: inputs.build-type == 'apk' && inputs.mode == 'release' && inputs.split-per-abi == 'false'
+        run: flutter build apk --release ${{ inputs.target-platform != '' && format('--target-platform {0}', inputs.target-platform) || '' }}
+
+      - name: Build APK (debug)
+        if: inputs.build-type == 'apk' && inputs.mode == 'debug' && inputs.split-per-abi == 'false'
+        run: flutter build apk --debug ${{ inputs.target-platform != '' && format('--target-platform {0}', inputs.target-platform) || '' }}
+
+      - name: Build APK (split per ABI - release)
+        if: inputs.build-type == 'apk' && inputs.mode == 'release' && inputs.split-per-abi == 'true'
+        run: flutter build apk --release --split-per-abi ${{ inputs.target-platform != '' && format('--target-platform {0}', inputs.target-platform) || '' }}
+
+      - name: Build APK (split per ABI - debug)
+        if: inputs.build-type == 'apk' && inputs.mode == 'debug' && inputs.split-per-abi == 'true'
+        run: flutter build apk --debug --split-per-abi ${{ inputs.target-platform != '' && format('--target-platform {0}', inputs.target-platform) || '' }}
+
+      - name: Build AppBundle (release)
+        if: inputs.build-type == 'appbundle' && inputs.mode == 'release'
+        run: flutter build appbundle --release
+
+      - name: Build AppBundle (debug)
+        if: inputs.build-type == 'appbundle' && inputs.mode == 'debug'
+        run: flutter build appbundle --debug
+
+      - name: Upload APK artifact
+        if: inputs.build-type == 'apk'
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-apk-${{ inputs.mode }}
+          path: build/app/outputs/flutter-apk/*.apk
+          retention-days: 7
+
+      - name: Upload AppBundle artifact
+        if: inputs.build-type == 'appbundle'
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-appbundle-${{ inputs.mode }}
+          path: build/app/outputs/bundle/release/*.aab
+          retention-days: 7
